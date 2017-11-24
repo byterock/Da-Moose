@@ -1,4 +1,4 @@
-package DBIx::DA::SQL::Roles::Field::Comparators;use lib qw( E:\chemstore_m\DA-0.01\lib);
+package DBIx::DA::SQL::Roles::Field::Comparators;use lib qw( d:\GitHub\DataAccessor_moose\Da-Moose\DA\lib);
 use DBIx::DA::Constants::SQL;
 
 use Moose::Role;

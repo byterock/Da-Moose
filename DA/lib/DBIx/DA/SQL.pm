@@ -3,7 +3,7 @@ package DBIx::DA::SQL;
 BEGIN {
     $DBIx::DA::SQL::VERSION = "0.01";
 }
-use lib qw( E:\chemstore_m\DA-0.01\lib);
+use lib qw( d:\GitHub\DataAccessor_moose\Da-Moose\DA\lib);
 
 #use lib qw(C:\Users\John Scoles\Dropbox\Code_Base\chemstore_perl_05_19\Orignal\Orignal\lib\DA);
 use DBI;
@@ -70,7 +70,9 @@ has fields => (
     is      => 'ro',
     isa     => 'ArrayRefofSelectFields',
     coerce  => 1,
-    handles => { count_fields => 'count', }
+    handles => { count_fields => 'count',
+                 find_field=>'first',
+     }
 );
 
 has joins => (
@@ -833,32 +835,33 @@ sub _delete {
     ##warn("Delete sql=".$sql);
     return $sql;
 }
-
-sub _insert {
+    
+sub _insert_clause {
     my $self             = shift;
     my ($container)      = @_;
     my $delimiter        = "";
-    my $field_str        = "";
-    my $value_str        = "";
+    my $field_clause     = "";
+    my $value_clause        = "";
     my @fields_to_insert = $self->fields();
     my $sql =
       DBIx::DA::Constants::SQL::INSERT . " INTO " . $self->table()->name();
 
     #$container->isa();
 
-    if ( ref($container) ne "HASH" ) {    #insert with select
-        foreach my $key ( $self->_only_fields ) {
-            my $field = $self->field_named($key);
-            next
-              unless $field;
-
-            $field_str .= $delimiter . $field->name();
+    if ( ref($container) eq "DBIx::DA::SQL" ) {    #insert with select
+        foreach my $field  ( $self->fields ) {
+           
+           next
+             if (($field->table() and $field->table() ne $self->table()->name())
+                  or ($field->no_insert() or $field->expression()));
+                  
+            $field_clause  .= $delimiter . $field->name();
             $delimiter = ", ";
         }
-        $sql .= " (" . $field_str . " ) " . $container->_select_clause();
+        $sql .= " (" . $field_clause . " ) " . $container->_select_clause();
 
-        foreach my $sub_param ( $container->dynamic_predicates() ) {
-            $self->push__params( $sub_param->param() );
+        foreach my $sub_param ( @{$container->_params()} ) {
+            $self->add_params($sub_param);
         }
     }
     else {
@@ -867,24 +870,15 @@ sub _insert {
 
         foreach my $key ( keys( %{$container} ) ) {
 
-            my $field = $self->field_named($key);
+            my $field = $self->find_field(sub {$_->name eq $key});
             next
               unless $field;
+            next 
+              if $field->no_insert();
             use Data::Dumper;
-
-            ##warn("DA::SQL insert key=".$key);
-            ##warn("DA::SQL insert field isa =".ref($field));
-            $field->value( $container->{$key} );
-            push( @fields_to_insert, $field );
-        }
-
-        foreach my $field (@fields_to_insert) {
-
-            unless ( $field->no_insert() ) {
-                $field_str .= $delimiter . $field->name();
-                $value_str .= $delimiter;
-                if ( $field->is_identity() and $field->sequence() ) {
-                    $value_str .= $field->sequence() . ".nextval";
+            $field_clause .= $delimiter . $field->name();
+            if ( $field->is_identity() and $field->sequence() ) {
+                    $value_clause .= $field->sequence() . ".nextval";
                     $self->returning(
                         DBIx::DA::Returning->new(
                             {
@@ -899,30 +893,26 @@ sub _insert {
                             }
                         )
                     );
-                }
-                elsif ( $field->value() eq 'sysdate' ) {
-                    $value_str .= "sysdate";
-                }
-                else {
-                    $self->push__params($field);
-
-                    ##warn("insert param push");
-                    if ( $self->use_named_params() ) {
-                        $value_str .= " :p_" . $field->name();
-                    }
-                    else {
-                        $value_str .= " ? ";
-                    }
-                }
+             }
+             elsif ($container->{$key} eq 'sysdate' ) { #others as well
+                    $value_clause .= "sysdate";
+             }
+             else {
+               my $param =  DBIx::DA::Param->new({value=> $container->{$key}});
+               
+               $self->_add_param($param);
+                  
+               $value_clause.= $delimiter
+                               .$param->sql($self);
                 $delimiter = ", ";
-            }
+             }    
         }
 
-        $sql .= " (" . $field_str . " ) VALUES (" . $value_str . ")";
+        $sql .= " (" . $field_clause . " ) VALUES (" . $value_clause . ")";
 
-        if ( $self->returning() ) {
-            $sql .= $self->_returning_clause();
-        }
+        # if ( $self->returning() ) {
+            # $sql .= $self->_returning_clause();
+        # }
     }
     return $sql;
 }

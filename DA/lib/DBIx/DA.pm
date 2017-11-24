@@ -4,7 +4,7 @@ BEGIN {
   $DBIx::DA::VERSION = "0.01";
 }
 
-use lib qw( E:\chemstore_m\DA-0.01\lib);
+use lib qw( d:\GitHub\DataAccessor_moose\Da-Moose\DA\lib);
 
 use Carp();
 use warnings;

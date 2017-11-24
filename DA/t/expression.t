@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use lib qw( e:\chemstore_m\DA-0.01\lib);
+use lib qw( d:\GitHub\DataAccessor_moose\Da-Moose\DA\lib);
 
 # D:/Perl64/site/lib
 # D:/Perl64/lib);
